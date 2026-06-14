@@ -15,3 +15,8 @@ def info():
 @app.get("/")
 def root():
     return {"status": "ok", "service": "devops-api"}
+
+
+@app.get("/info")
+def info():
+    return {"CI_CD": "Implemented with GitHub Actions", "AWS_Services": ["ECR", "ECS", "VPC"]}
