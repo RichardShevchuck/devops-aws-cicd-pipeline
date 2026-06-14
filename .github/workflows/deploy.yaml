@@ -7,10 +7,11 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: my-ecr-repo     
-  ECS_CLUSTER: ecs-cluster          
-  ECS_SERVICE: my-ecs-service      
-  CONTAINER_NAME: app              
+  ECR_REPOSITORY: my-ecr-repo
+  ECS_CLUSTER: ecs-cluster
+  ECS_SERVICE: my-ecs-service
+  CONTAINER_NAME: app
+  TASK_DEFINITION: my-ecs-task
 jobs:
   test:
     name: Run Tests
@@ -83,7 +84,7 @@ jobs:
       - name: Download current ECS task definition
         run: |
           aws ecs describe-task-definition \
-            --task-definition ${{ env.CONTAINER_NAME }} \
+            --task-definition ${{ env.TASK_DEFINITION }} \
             --query taskDefinition > task-definition.json
 
       - name: Update task definition with new image
