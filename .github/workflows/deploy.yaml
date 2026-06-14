@@ -7,11 +7,10 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: devops-api
-  ECS_CLUSTER: devops-cluster
-  ECS_SERVICE: devops-api-service
-  CONTAINER_NAME: devops-api
-
+  ECR_REPOSITORY: my-ecr-repo     
+  ECS_CLUSTER: ecs-cluster          
+  ECS_SERVICE: my-ecs-service      
+  CONTAINER_NAME: app              
 jobs:
   test:
     name: Run Tests
