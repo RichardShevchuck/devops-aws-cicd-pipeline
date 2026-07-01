@@ -1,102 +1,87 @@
-# DevOps Project 06 — AWS CI/CD Pipeline
+# AWS CI/CD Pipeline — ECS Fargate
 
-FastAPI app with automated CI/CD: GitHub Actions → Docker → ECR → ECS Fargate. Infrastructure as Code with Terraform.
+FastAPI Python application with a GitHub Actions pipeline that tests code, builds a Docker image, pushes it to ECR, and deploys it to ECS Fargate. Infrastructure provisioned with Terraform.
+
+## Pipeline
+
+```
+git push → GitHub Actions
+                │
+          ┌─────▼──────┐
+          │    test     │  pytest
+          └─────┬───────┘
+                │
+          ┌─────▼──────────┐
+          │ build & push   │  Docker build → ECR (tag: commit SHA)
+          └─────┬───────────┘
+                │
+          ┌─────▼──────────┐
+          │    deploy      │  Render ECS task def → deploy → wait for stable
+          └─────────────────┘
+```
 
 ## Architecture
 
 ```
 Internet
-    │
-    ▼
-┌─────────────────────────────────┐
-│  VPC (10.0.0.0/16)              │
-│                                 │
-│  ┌──────────┬──────────┐        │
-│  │ subnet 1 │ subnet 2 │        │
-│  │ 10.0.1.0 │ 10.0.2.0 │◄─ IGW │
-│  └────┬─────┴──────────┘        │
-│       │                         │
-│  ┌────▼────────────────┐        │
-│  │  ALB (port 80)      │        │
-│  └────┬────────────────┘        │
-│       │                         │
-│  ┌────▼────────────────┐        │
-│  │  ECS Fargate        │        │
-│  │  FastAPI (port 8000)│        │
-│  └─────────────────────┘        │
-└─────────────────────────────────┘
+  │
+  ▼
+ALB (public)
+  │
+  ▼
+ECS Fargate Service
+  │ (pulls image from)
+  ▼
+ECR Repository
 ```
 
-**CI/CD Pipeline:**
-```
-git push main
-    │
-    ▼
-GitHub Actions
-    ├── test          (pip install + pytest)
-    ├── build-and-push (docker build → ECR)
-    └── deploy        (update ECS task definition)
-```
+## Tech Stack
 
-## Stack
-
-| Tool | Purpose |
-|------|---------|
-| FastAPI | Python web framework |
-| Docker | Containerization |
-| GitHub Actions | CI/CD pipeline |
-| AWS ECR | Docker image registry |
-| AWS ECS Fargate | Container orchestration (serverless) |
-| AWS ALB | Application Load Balancer |
-| Terraform | Infrastructure as Code |
+- **App:** Python 3.12, FastAPI, Uvicorn
+- **Container:** Docker, AWS ECR
+- **CI/CD:** GitHub Actions
+- **Compute:** AWS ECS Fargate
+- **Load Balancer:** AWS ALB
+- **IaC:** Terraform
 
 ## Terraform Modules
 
 ```
 terraform/modules/
-├── vpc/    # VPC, subnets, IGW, route tables
-├── ecr/    # ECR repository
+├── vpc/    # VPC, public/private subnets, IGW, route tables
+├── ecr/    # ECR repository with lifecycle policies
 ├── iam/    # ECS task execution role
-├── alb/    # ALB, target group, listener
-└── ecs/    # ECS cluster, task definition, service
+├── alb/    # ALB, target group, HTTP listener
+└── ecs/    # ECS cluster, task definition, Fargate service
 ```
+
+## GitHub Actions Secrets Required
+
+Set in **GitHub → Settings → Environments → `ci-cd`**:
+
+| Secret | Description |
+|--------|-------------|
+| `AWS_ACCESS_KEY_ID` | IAM user access key |
+| `AWS_SECRET_ACCESS_KEY` | IAM user secret key |
 
 ## API Endpoints
 
-| Method | Path | Response |
-|--------|------|----------|
-| GET | `/` | `{"status": "ok", "service": "devops-api"}` |
-| GET | `/health` | `{"status": "healthy"}` |
-| GET | `/info` | `{"devops_project_number": "6"}` |
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Root |
+| GET | `/health` | Health check |
+| GET | `/info` | App info |
 
-## Quick Start
-
-**Prerequisites:** AWS credentials, Terraform, Docker
+## Deploy Infrastructure
 
 ```bash
-# 1. Deploy infrastructure
 cd terraform/
 terraform init
 terraform apply
-
-# 2. Add GitHub Secrets (Settings → Secrets → Actions → Environment: ci-cd)
-#    AWS_ACCESS_KEY_ID
-#    AWS_SECRET_ACCESS_KEY
-
-# 3. Push to main — pipeline runs automatically
-git push origin main
 ```
 
-## Local Development
+## Key Concepts
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-# http://localhost:8000
-```
-
-## Cost
-
-ALB ~$0.02/hour. Run `terraform destroy` when not in use.
+- **Image tagged with commit SHA** — every deploy is traceable to an exact git commit
+- **ECS task definition render** — `aws-actions/amazon-ecs-render-task-definition` updates the image field
+- **Waits for stability** — pipeline blocks until ECS confirms all tasks are healthy before marking success
